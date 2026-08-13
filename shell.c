@@ -4,8 +4,35 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <stdlib.h>
+#include <signal.h>
+#include <stdbool.h>
 
 extern char** environ;
+
+pid_t child_pid; 
+
+int status;
+
+
+char* shell_builtin[3]={"pwd","cd","exit"};
+
+//SIGCHLD handler
+void sig_handler(int signum,siginfo_t* info,void* ucontext)
+{
+    if(signum==SIGCHLD)
+    {
+        
+        while(waitpid(-1,NULL,0)>0);  //reap all dead children
+
+
+    }
+
+}
+
+
+
+
+
 
 int main(int argc,char* argv[])
 {
@@ -15,21 +42,45 @@ int main(int argc,char* argv[])
 
     char command[500];
 
-    int i=0;
+    int i=0; //no of tokens
 
     char* delim=" \t";
 
     char* token;
 
-    pid_t child_pid;
+    struct sigaction action;
+
+    struct sigaction oldaction;
+
+    action.sa_flags=SA_SIGINFO ;//will install the handler referred by sa_sigaction field
+    action.sa_sigaction=sig_handler; //Handler for SIGCHLD when child terminates
+
+   
+    bool is_background_proc;
+
+    char pwd_buff[100]; 
+
 
 
     while(1)
     {
         i=0;
-        printf(":)");
+        is_background_proc=false;
+       if(getcwd(pwd_buff,100)==NULL)
+       {
+        perror("getcwd");
+        exit(EXIT_FAILURE);
+
+       }
+
+        printf("%s>",pwd_buff);
         fgets(command,500,stdin);
         command[strcspn(command,"\n")]='\0';
+
+
+
+
+
         token=strtok(command,delim);
 
         if(token==NULL)
@@ -46,15 +97,73 @@ int main(int argc,char* argv[])
         argvec[i]=NULL;
 
 
-  //Now we have built the arg vec
 
-//if user types exit
 
-    if(!strcmp(argvec[0],"exit"))
+//display current work directory
+
+if(i==1&&!strcmp(argvec[0],"pwd"))
+{
+    if(getcwd(pwd_buff,50)==NULL) //err
     {
-        exit(EXIT_SUCCESS);
+        perror("getcwd");
+        continue;
 
     }
+
+    printf("%s\n\n",pwd_buff);
+    continue;
+    
+
+
+}
+
+else if(i==1&&!strcmp(argvec[0],"exit"))
+{
+    printf("exit\n\n");
+    exit(EXIT_SUCCESS);
+
+}
+
+//change directory
+else if(i==2&&!strcmp(argvec[0],"cd"))
+{
+    if(chdir(argvec[1])==-1)
+    {
+        perror("chdir");
+      
+    }
+
+    continue;
+}
+
+
+
+  //Now we have built the arg vec...Done parsing input command
+
+  
+
+/*
+if its a background process regsiter the SIGCHLD handler
+      if(!strcmp(argvec[i-1],"&"))
+        {
+
+            argvec[i-1]=NULL; //since its not part of argument for the command
+            if(sigaction(SIGCHLD,&action,NULL)==-1)//failed to put process in background
+            {
+                perror("sigaction");
+                exit(EXIT_FAILURE);
+
+            } 
+
+            is_background_proc=true;
+        }
+
+
+*/
+
+
+   
+
 
 
     switch(child_pid=fork())
@@ -74,7 +183,13 @@ int main(int argc,char* argv[])
 
 
         default:
+
+        //printf("Child pid is %d\n",child_pid);
+
+     
         waitpid(child_pid,NULL,0); //wait for child
+
+        printf("\n"); //presentation
     
        
         
@@ -96,12 +211,3 @@ int main(int argc,char* argv[])
 }
 
 
-/*
-echo    hello world
-
-
-
-
-
-
-*/
