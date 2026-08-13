@@ -6,6 +6,15 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <stdbool.h>
+ #include <sys/types.h>
+ #include <sys/stat.h>
+  #include <fcntl.h>
+
+
+
+#define MAX_ARGS 100 
+#define MAX_COMMAND_LEN 100
+#define MAX_PATH 100 //pwd
 
 extern char** environ;
 
@@ -38,9 +47,9 @@ int main(int argc,char* argv[])
 {
    
 
-    char* argvec[100];
+    char* argvec[MAX_ARGS];
 
-    char command[500];
+    char command[MAX_COMMAND_LEN];
 
     int i=0; //no of tokens
 
@@ -58,15 +67,19 @@ int main(int argc,char* argv[])
    
     bool is_background_proc;
 
-    char pwd_buff[100]; 
+    char pwd_buff[MAX_PATH]; 
 
+    char* output_file;
+
+    
 
 
     while(1)
     {
+        output_file=NULL;
         i=0;
         is_background_proc=false;
-       if(getcwd(pwd_buff,100)==NULL)
+       if(getcwd(pwd_buff,MAX_PATH)==NULL)
        {
         perror("getcwd");
         exit(EXIT_FAILURE);
@@ -74,7 +87,10 @@ int main(int argc,char* argv[])
        }
 
         printf("%s>",pwd_buff);
-        fgets(command,500,stdin);
+        if(fgets(command,MAX_COMMAND_LEN,stdin)==NULL)
+        {
+            continue;
+        }
         command[strcspn(command,"\n")]='\0';
 
 
@@ -97,13 +113,48 @@ int main(int argc,char* argv[])
         argvec[i]=NULL;
 
 
+ //Implement redirect standard output feature 
+ //e.g ls > output.txt
+
+ 
+ for(int j=0;j<i;j++)
+ {
+    bool flag=false;
+
+    if(!strcmp(argvec[j],">"))
+    {
+        if(j==i-1)
+        {
+            // no file specified to redirect
+            printf("Syntax error\n\n");
+            flag=true;
+            break;
+        }
+
+        else
+        {
+            output_file=argvec[j+1];
+            argvec[j]=NULL; // ignore whatever comes after >
+
+        }
+
+
+
+    }
+    if(flag)
+    continue;
+ }
+
+
+
+
 
 
 //display current work directory
 
 if(i==1&&!strcmp(argvec[0],"pwd"))
 {
-    if(getcwd(pwd_buff,50)==NULL) //err
+    if(getcwd(pwd_buff,MAX_PATH)==NULL) //err
     {
         perror("getcwd");
         continue;
@@ -170,6 +221,26 @@ if its a background process regsiter the SIGCHLD handler
     { 
         //child
         case 0:
+    
+        //check if std output is to be redirected
+
+        if(output_file!=NULL)
+        {
+            int fd=open(output_file,O_WRONLY|O_CREAT|O_TRUNC,0644);
+            if(fd==-1)
+            {
+                perror("open");
+                exit(EXIT_FAILURE);
+            }
+
+            dup2(fd,STDOUT_FILENO); //file desscriptor 1 will point to the output file
+
+
+            close(fd);// no more useful
+
+
+        }
+
         if(execvp(argvec[0],argvec)==-1)
         {
             perror("execvp");
@@ -179,7 +250,9 @@ if its a background process regsiter the SIGCHLD handler
 
       
 
-        case -1: continue;
+        case -1: 
+        perror("fork");
+        continue;
 
 
         default:
@@ -211,3 +284,9 @@ if its a background process regsiter the SIGCHLD handler
 }
 
 
+/*
+
+ls > output.txt 
+
+
+*/
