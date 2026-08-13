@@ -26,19 +26,23 @@ int main(int argc,char* argv[])
 
     while(1)
     {
+        i=0;
         printf(":)");
         fgets(command,500,stdin);
+        command[strcspn(command,"\n")]='\0';
         token=strtok(command,delim);
 
         if(token==NULL)
         continue;
         while(token!=NULL)
         {
+          //  printf("%s",token);
             argvec[i++]=token;
             token=strtok(NULL,delim);
 
         }
 
+      //printf("%s",argvec[0]);
         argvec[i]=NULL;
 
 
@@ -59,7 +63,7 @@ int main(int argc,char* argv[])
         case 0:
         if(execvp(argvec[0],argvec)==-1)
         {
-            printf("Couldnt execute the command (execvp failure)\n");
+            perror("execvp");
             exit(1);
         }
 
@@ -71,9 +75,8 @@ int main(int argc,char* argv[])
 
         default:
         waitpid(child_pid,NULL,0); //wait for child
-        i=0;
-
-        continue;
+    
+       
         
 
 
