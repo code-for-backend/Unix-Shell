@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <stdlib.h>
 
 extern char** environ;
 
@@ -22,7 +23,6 @@ int main(int argc,char* argv[])
 
     pid_t child_pid;
 
-    int* status;
 
     while(1)
     {
@@ -41,7 +41,7 @@ int main(int argc,char* argv[])
 
         argvec[i]=NULL;
 
-        
+
   //Now we have built the arg vec
 
 //if user types exit
@@ -70,7 +70,7 @@ int main(int argc,char* argv[])
 
 
         default:
-        waitpid(child_pid,&status,0); //wait for child
+        waitpid(child_pid,NULL,0); //wait for child
         i=0;
 
         continue;
