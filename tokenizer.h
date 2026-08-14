@@ -1,3 +1,6 @@
+#ifndef TOKENIZER_H
+#define TOKENIZER_H
+
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -21,3 +24,6 @@ typedef struct {
 
 int tokenize(const char *input, Token tokens[MAX_TOKENS]);
 const char *token_type_name(TokenType t);
+
+
+#endif
