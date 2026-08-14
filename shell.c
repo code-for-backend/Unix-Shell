@@ -10,20 +10,15 @@
  #include <sys/stat.h>
   #include <fcntl.h>
 
-
-
-#define MAX_ARGS 100 
-#define MAX_COMMAND_LEN 100
-#define MAX_PATH 100 //pwd
+#include "tokenizer.h"
 
 extern char** environ;
 
-pid_t child_pid; 
-
-int status;
-
 
 char* shell_builtin[3]={"pwd","cd","exit"};
+
+char* output_file[100];
+char* input_file[100];
 
 //SIGCHLD handler
 void sig_handler(int signum,siginfo_t* info,void* ucontext)
@@ -40,253 +35,65 @@ void sig_handler(int signum,siginfo_t* info,void* ucontext)
 
 
 
-
-
-
 int main(int argc,char* argv[])
 {
    
-
-    char* argvec[MAX_ARGS];
-
-    char command[MAX_COMMAND_LEN];
-
-    int i=0; //no of tokens
-
-    char* delim=" \t";
-
-    char* token;
-
-    struct sigaction action;
-
-    struct sigaction oldaction;
-
-    action.sa_flags=SA_SIGINFO ;//will install the handler referred by sa_sigaction field
-    action.sa_sigaction=sig_handler; //Handler for SIGCHLD when child terminates
-
-   
-    bool is_background_proc;
-
-    char pwd_buff[MAX_PATH]; 
-
-    char* output_file;
-
-    
-
-
-    while(1)
-    {
-        output_file=NULL;
-        i=0;
-        is_background_proc=false;
-       if(getcwd(pwd_buff,MAX_PATH)==NULL)
-       {
-        perror("getcwd");
-        exit(EXIT_FAILURE);
-
-       }
-
-        printf("%s>",pwd_buff);
-        if(fgets(command,MAX_COMMAND_LEN,stdin)==NULL)
-        {
-            continue;
-        }
-        command[strcspn(command,"\n")]='\0';
-
-
-
-
-
-        token=strtok(command,delim);
-
-        if(token==NULL)
-        continue;
-        while(token!=NULL)
-        {
-          //  printf("%s",token);
-            argvec[i++]=token;
-            token=strtok(NULL,delim);
-
-        }
-
-      //printf("%s",argvec[0]);
-        argvec[i]=NULL;
-
-
- //Implement redirect standard output feature 
- //e.g ls > output.txt
+ Token tokens[MAX_TOKENS];
 
  
- for(int j=0;j<i;j++)
- {
-    bool flag=false;
+char* lineptr; //address of buff allocated for input command
+size_t n; //size of buff allocated;
 
-    if(!strcmp(argvec[j],">"))
-    {
-        if(j==i-1)
-        {
-            // no file specified to redirect
-            printf("Syntax error\n\n");
-            flag=true;
-            break;
-        }
-
-        else
-        {
-            output_file=argvec[j+1];
-            argvec[j]=NULL; // ignore whatever comes after >
-
-        }
-
-
-
-    }
-    if(flag)
-    continue;
- }
-
-
-
-
-
-
-//display current work directory
-
-if(i==1&&!strcmp(argvec[0],"pwd"))
+if(getline(&lineptr,&n,stdin)==-1)
 {
-    if(getcwd(pwd_buff,MAX_PATH)==NULL) //err
-    {
-        perror("getcwd");
-        continue;
-
-    }
-
-    printf("%s\n\n",pwd_buff);
-    continue;
-    
-
-
+    free(lineptr);
+    printf("Failed to read command\n");
+    exit(EXIT_FAILURE);
 }
 
-else if(i==1&&!strcmp(argvec[0],"exit"))
-{
-    printf("exit\n\n");
-    exit(EXIT_SUCCESS);
+char* command=lineptr;
 
-}
+command[strcspn(command,"\n")]='\0';
 
-//change directory
-else if(i==2&&!strcmp(argvec[0],"cd"))
-{
-    if(chdir(argvec[1])==-1)
-    {
-        perror("chdir");
-      
-    }
-
-    continue;
-}
+printf("Command is %s\n",command);
 
 
+printf("Length of cmd is %ld\n",strlen(command));
 
-  //Now we have built the arg vec...Done parsing input command
 
-  
+int token_count=tokenize(command,tokens);
 
 /*
-if its a background process regsiter the SIGCHLD handler
-      if(!strcmp(argvec[i-1],"&"))
-        {
+Output the list of tokens. works correctly
 
-            argvec[i-1]=NULL; //since its not part of argument for the command
-            if(sigaction(SIGCHLD,&action,NULL)==-1)//failed to put process in background
-            {
-                perror("sigaction");
-                exit(EXIT_FAILURE);
-
-            } 
-
-            is_background_proc=true;
+ for (int i = 0; i < token_count; i++) {
+            if (tokens[i].type == TOKEN_WORD) {
+                printf("%s  %s\n", token_type_name(tokens[i].type), tokens[i].text);
+            } else {
+                printf("%s\n", token_type_name(tokens[i].type));
+            }
         }
-
 
 */
 
 
-   
 
-
-
-    switch(child_pid=fork())
-    { 
-        //child
-        case 0:
-    
-        //check if std output is to be redirected
-
-        if(output_file!=NULL)
-        {
-            int fd=open(output_file,O_WRONLY|O_CREAT|O_TRUNC,0644);
-            if(fd==-1)
-            {
-                perror("open");
-                exit(EXIT_FAILURE);
-            }
-
-            dup2(fd,STDOUT_FILENO); //file desscriptor 1 will point to the output file
-
-
-            close(fd);// no more useful
-
-
-        }
-
-        if(execvp(argvec[0],argvec)==-1)
-        {
-            perror("execvp");
-            exit(1);
-        }
-
-
-      
-
-        case -1: 
-        perror("fork");
-        continue;
-
-
-        default:
-
-        //printf("Child pid is %d\n",child_pid);
-
-     
-        waitpid(child_pid,NULL,0); //wait for child
-
-        printf("\n"); //presentation
-    
-       
-        
-
-
-
-
-    }
-
-    
-
-    }
-
-
-
-    return 0;
 
 
 }
 
 
 /*
+Bash redirection supports:-
 
-ls > output.txt 
+command > file
+command < file
+command < input > output
+command > a > b
+command < a < b
+
+for now
+
 
 
 */
